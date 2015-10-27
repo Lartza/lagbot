@@ -1,7 +1,6 @@
 # coding=utf-8
 from yapsy.IPlugin import IPlugin
 
-import collections
 
 class IRCPlugin(IPlugin):
 

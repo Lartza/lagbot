@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#coding=utf-8
+# coding=utf-8
 # lagirc, simple Python irc library
 # Copyright (C) 2015  Lari Tikkanen
 #
@@ -16,14 +16,18 @@ from plugins.handlerplugin import HandlerPlugin
 
 config = ConfigObj('config.cfg')
 
-class lagbot(lagirc.IRCClient):
-    
+
+class LagBot(lagirc.IRCClient):
     def __init__(self, network, identity):
         super().__init__()
         self.network = network
         self.nickname = identity['nickname']
         self.username = identity['username']
         self.realname = identity['realname']
+        self.manager = None
+        self.commands = {}
+        self.admincommands = {}
+        self.handlers = []
         self.init_plugins()
 
     def init_plugins(self, reload=False):
@@ -31,15 +35,12 @@ class lagbot(lagirc.IRCClient):
             for plugin in self.manager.getAllPlugins():
                 self.manager.deactivatePluginByName(plugin.name)
         self.manager = PluginManager(
-        categories_filter = {
-            "Command" : CommandPlugin,
-            "Handler" : HandlerPlugin,
-        },
-        directories_list=["plugins"],)
+            categories_filter={
+                "Command": CommandPlugin,
+                "Handler": HandlerPlugin,
+            },
+            directories_list=["plugins"], )
         self.manager.collectPlugins()
-        self.commands = {}
-        self.admincommands = {}
-        self.handlers = []
         for plugin in self.manager.getPluginsOfCategory("Command"):
             self.manager.activatePluginByName(plugin.name, "Command")
             try:
@@ -49,9 +50,9 @@ class lagbot(lagirc.IRCClient):
                 pass
             try:
                 for command in plugin.plugin_object.admincommands:
-                    object = plugin.plugin_object
+                    pluginobject = plugin.plugin_object
                     adminlevel = plugin.plugin_object.adminlevel
-                    self.admincommands[command] = object,adminlevel
+                    self.admincommands[command] = pluginobject, adminlevel
             except:
                 pass
         for plugin in self.manager.getPluginsOfCategory("Handler"):
@@ -77,7 +78,7 @@ class lagbot(lagirc.IRCClient):
                 plugin = self.commands[cmd]
             except KeyError:
                 plugin = None
-                if is_admin(user):
+                if self.is_admin(user):
                     try:
                         plugin = self.admincommands[cmd][0]
                     except KeyError:
@@ -87,11 +88,13 @@ class lagbot(lagirc.IRCClient):
         for handler in self.handlers:
             handler.execute(self, user, channel, message)
 
+
 loop = asyncio.get_event_loop()
 for network in config['networks'].keys():
     identity = config['identities'][config['networks'][network]['identity']]
-    client = lagbot(network, identity)
-    coro = loop.create_connection(lambda: client, config['networks'][network]['host'], int(config['networks'][network]['port']))
+    client = LagBot(network, identity)
+    coro = loop.create_connection(lambda: client, config['networks'][network]['host'],
+                                  int(config['networks'][network]['port']))
     loop.run_until_complete(coro)
 loop.run_forever()
 loop.close()
