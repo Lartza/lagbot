@@ -8,6 +8,7 @@
 
 from configobj import ConfigObj
 import logging
+import re
 
 import lagirc
 import asyncio
@@ -15,6 +16,7 @@ import asyncio
 from yapsy.PluginManager import PluginManager
 from plugins.commandplugin import CommandPlugin
 from plugins.handlerplugin import HandlerPlugin
+from plugins.triggerplugin import TriggerPlugin
 
 config = ConfigObj('config.cfg')
 logging.basicConfig(level=config['global']['loglevel'])
@@ -32,6 +34,7 @@ class LagBot(lagirc.IRCClient):
         self.manager = None
         self.commands = {}
         self.handlers = []
+        self.triggers = {}
         self.logger = logging.getLogger('LagBot')
         self.logger.setLevel(config['global']['loglevel'])
         self.init_plugins()
@@ -42,12 +45,14 @@ class LagBot(lagirc.IRCClient):
         if reload:
             self.commands = {}
             self.handlers = []
+            self.triggers = {}
             for plugin in self.manager.getAllPlugins():
                 self.manager.deactivatePluginByName(plugin.name)
         self.manager = PluginManager(
             categories_filter={
                 'Command': CommandPlugin,
                 'Handler': HandlerPlugin,
+                'Trigger': TriggerPlugin,
             },
             directories_list=['plugins'], )
         self.manager.collectPlugins()
@@ -64,9 +69,19 @@ class LagBot(lagirc.IRCClient):
             self.manager.activatePluginByName(plugin.name, 'Handler')
             self.handlers.append(plugin.plugin_object)
             self.logger.debug('Loaded plugin {}'.format(plugin.name))
+        for plugin in self.manager.getPluginsOfCategory('Trigger'):
+            self.manager.activatePluginByName(plugin.name, 'Trigger')
+            try:
+                for trigger in plugin.plugin_object.triggers:
+                    self.triggers[re.compile(trigger)] = plugin.plugin_object
+            except AttributeError:
+                self.logger.warn('Plugin {} does not define any triggers! Disabling')
+                self.manager.deactivatePluginByName(plugin.name)
+            self.logger.debug('Loaded plugin {}'.format(plugin.name))
         self.logger.info('Finish plugin initialization')
         self.logger.debug('Commands: {}'.format(self.commands))
         self.logger.debug('Handlers: {}'.format(self.handlers))
+        self.logger.debug('Triggers: {}'.format(self.triggers))
 
     def connected(self):
         self.logger.info('Connected')
@@ -102,6 +117,11 @@ class LagBot(lagirc.IRCClient):
             if plugin:
                 self.logger.debug('Excecuting plugin for command {}'.format(cmd))
                 plugin.execute(self, user, channel, message)
+        else:
+            for trigger, plugin in self.triggers.items():
+                if re.search(trigger, message) is not None:
+                    plugin.execute(self, user, channel, message)
+                    break
         for handler in self.handlers:
             self.logger.debug('Excecuting handlers')
             handler.execute(self, user, channel, message)
