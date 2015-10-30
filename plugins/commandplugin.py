@@ -7,5 +7,5 @@ class CommandPlugin(IRCPlugin):
     def __init__(self):
         super().__init__()
 
-    def execute(self, message, *args, **kwargs):
+    def execute(self, bot, user, channel, message):
         raise NotImplementedError

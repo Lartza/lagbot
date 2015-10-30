@@ -6,11 +6,12 @@
 # Released under the GPLv3
 # See LICENSE for details.
 
+from configobj import ConfigObj
+
 import lagirc
 import asyncio
-from configobj import ConfigObj
-from yapsy.PluginManager import PluginManager
 
+from yapsy.PluginManager import PluginManager
 from plugins.commandplugin import CommandPlugin
 from plugins.handlerplugin import HandlerPlugin
 
@@ -32,6 +33,9 @@ class LagBot(lagirc.IRCClient):
 
     def init_plugins(self, reload=False):
         if reload:
+            self.commands = {}
+            self.admincommands = {}
+            self.handlers = []
             for plugin in self.manager.getAllPlugins():
                 self.manager.deactivatePluginByName(plugin.name)
         self.manager = PluginManager(
@@ -46,14 +50,14 @@ class LagBot(lagirc.IRCClient):
             try:
                 for command in plugin.plugin_object.commands:
                     self.commands[command] = plugin.plugin_object
-            except:
+            except AttributeError:
                 pass
             try:
                 for command in plugin.plugin_object.admincommands:
                     pluginobject = plugin.plugin_object
                     adminlevel = plugin.plugin_object.adminlevel
                     self.admincommands[command] = pluginobject, adminlevel
-            except:
+            except AttributeError:
                 pass
         for plugin in self.manager.getPluginsOfCategory("Handler"):
             self.manager.activatePluginByName(plugin.name, "Handler")
@@ -71,18 +75,20 @@ class LagBot(lagirc.IRCClient):
         return False
 
     def privmsg_received(self, user, channel, message):
-        nick = user.split('!', 1)[0]
         if message.startswith('!'):
-            cmd = message.split(' ', 1)[0]
+            cmd = message.split(' ', 1)[0].lstrip('!')
             try:
                 plugin = self.commands[cmd]
             except KeyError:
                 plugin = None
                 if self.is_admin(user):
-                    try:
-                        plugin = self.admincommands[cmd][0]
-                    except KeyError:
-                        pass
+                    if cmd == 'reload':
+                        self.init_plugins(reload=True)
+                    else:
+                        try:
+                            plugin = self.admincommands[cmd][0]
+                        except KeyError:
+                            pass
             if plugin:
                 plugin.execute(self, user, channel, message)
         for handler in self.handlers:
