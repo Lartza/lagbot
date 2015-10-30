@@ -32,11 +32,13 @@ class LagBot(lagirc.IRCClient):
         self.manager = None
         self.commands = {}
         self.handlers = []
-        self.init_plugins()
         self.logger = logging.getLogger('LagBot')
         self.logger.setLevel(config['global']['loglevel'])
+        self.init_plugins()
 
     def init_plugins(self, reload=False):
+        self.logger.info('Start initializing plugins')
+        self.logger.debug('Reloading plugins? {}'.format(reload))
         if reload:
             self.commands = {}
             self.handlers = []
@@ -57,9 +59,14 @@ class LagBot(lagirc.IRCClient):
             except AttributeError:
                 self.logger.warn('Plugin {} does not define any commands! Disabling')
                 self.manager.deactivatePluginByName(plugin.name)
+            self.logger.debug('Loaded plugin {}'.format(plugin.name))
         for plugin in self.manager.getPluginsOfCategory('Handler'):
             self.manager.activatePluginByName(plugin.name, 'Handler')
             self.handlers.append(plugin.plugin_object)
+            self.logger.debug('Loaded plugin {}'.format(plugin.name))
+        self.logger.info('Finish plugin initialization')
+        self.logger.debug('Commands: {}'.format(self.commands))
+        self.logger.debug('Handlers: {}'.format(self.handlers))
 
     def connected(self):
         self.logger.info('Connected')
@@ -81,18 +88,22 @@ class LagBot(lagirc.IRCClient):
         return user.split('!', 1)[0]
 
     def privmsg_received(self, user, channel, message):
+        self.logger.info('{} <{}> {}'.format(channel, self.get_nick(user), message))
         if message.startswith('!'):
             cmd = message.split(' ', 1)[0].lstrip('!')
             try:
                 plugin = self.commands[cmd]
             except KeyError:
+                self.logger.debug('No plugin found for command {}'.format(cmd))
                 plugin = None
                 if self.is_owner(user):
                     if cmd == 'reload':
                         self.init_plugins(reload=True)
             if plugin:
+                self.logger.debug('Excecuting plugin for command {}'.format(cmd))
                 plugin.execute(self, user, channel, message)
         for handler in self.handlers:
+            self.logger.debug('Excecuting handlers')
             handler.execute(self, user, channel, message)
 
 loop = asyncio.get_event_loop()
