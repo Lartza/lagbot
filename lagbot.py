@@ -15,7 +15,13 @@ from yapsy.PluginManager import PluginManager
 from plugins.commandplugin import CommandPlugin
 from plugins.handlerplugin import HandlerPlugin
 
+debug = False
 config = ConfigObj('config.cfg')
+if debug:
+    import logging
+    import warnings
+    logging.basicConfig(level=logging.DEBUG)
+    warnings.resetwarnings()
 
 
 class LagBot(lagirc.IRCClient):
@@ -96,6 +102,8 @@ class LagBot(lagirc.IRCClient):
 
 
 loop = asyncio.get_event_loop()
+if debug:
+    loop.set_debug(True)
 for network in config['networks'].keys():
     identity = config['identities'][config['networks'][network]['identity']]
     client = LagBot(network, identity)
