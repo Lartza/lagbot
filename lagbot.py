@@ -43,6 +43,7 @@ class LagBot(lagirc.IRCClient):
         self.logger.info('Start initializing plugins')
         self.logger.debug('Reloading plugins? {}'.format(reload))
         if reload:
+            config.reload()
             self.commands = {}
             self.handlers = []
             self.triggers = {}
@@ -95,8 +96,15 @@ class LagBot(lagirc.IRCClient):
         return False
 
     def is_op(self, user, channel):
-        if user in config[channel].as_list('ops'):
-            return True
+        try:
+            self.logger.debug(config[channel].as_list('ops'))
+            if user in config[channel].as_list('ops'):
+                self.logger.debug('{} matches {} ops'.format(user, channel))
+                return True
+        except KeyError:
+            self.logger.debug('No ops for channel {}'.format(channel))
+            return False
+        self.logger.debug("{} doesn't match ops for {}".format(user, channel))
         return False
 
     def get_nick(self, user):
