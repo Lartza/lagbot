@@ -7,6 +7,7 @@
 # See LICENSE for details.
 
 from configobj import ConfigObj
+import logging
 
 import lagirc
 import asyncio
@@ -15,12 +16,10 @@ from yapsy.PluginManager import PluginManager
 from plugins.commandplugin import CommandPlugin
 from plugins.handlerplugin import HandlerPlugin
 
-debug = False
 config = ConfigObj('config.cfg')
-if debug:
-    import logging
+logging.basicConfig(level=config['global']['loglevel'])
+if logging.getLogger().isEnabledFor(logging.DEBUG):
     import warnings
-    logging.basicConfig(level=logging.DEBUG)
     warnings.resetwarnings()
 
 
@@ -34,6 +33,8 @@ class LagBot(lagirc.IRCClient):
         self.commands = {}
         self.handlers = []
         self.init_plugins()
+        self.logger = logging.getLogger('LagBot')
+        self.logger.setLevel(config['global']['loglevel'])
 
     def init_plugins(self, reload=False):
         if reload:
@@ -54,17 +55,17 @@ class LagBot(lagirc.IRCClient):
                 for command in plugin.plugin_object.commands:
                     self.commands[command] = plugin.plugin_object
             except AttributeError:
-                print('Plugin {} does not define any commands! Disabling')
+                self.logger.warn('Plugin {} does not define any commands! Disabling')
                 self.manager.deactivatePluginByName(plugin.name)
         for plugin in self.manager.getPluginsOfCategory('Handler'):
             self.manager.activatePluginByName(plugin.name, 'Handler')
             self.handlers.append(plugin.plugin_object)
 
     def connected(self):
-        print('Connected')
+        self.logger.info('Connected')
         for channel in config['global'].as_list('channels'):
             self.join(channel)
-            print('Joined {0}'.format(channel))
+            self.logger.info('Joined {0}'.format(channel))
 
     def is_owner(self, user):
         if user == config['global']['owner']:
@@ -95,7 +96,7 @@ class LagBot(lagirc.IRCClient):
             handler.execute(self, user, channel, message)
 
 loop = asyncio.get_event_loop()
-if debug:
+if logging.getLogger().isEnabledFor(logging.DEBUG):
     loop.set_debug(True)
 coro = loop.create_connection(lambda: LagBot(), config['global']['host'],
                               int(config['global']['port']))
