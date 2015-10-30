@@ -134,6 +134,9 @@ class LagBot(lagirc.IRCClient):
             self.logger.debug('Excecuting handlers')
             handler.execute(self, user, channel, message)
 
+    def connection_lost(self, exc):
+        loop.stop()
+
 loop = asyncio.get_event_loop()
 if logging.getLogger().isEnabledFor(logging.DEBUG):
     loop.set_debug(True)
