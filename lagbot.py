@@ -25,12 +25,11 @@ if debug:
 
 
 class LagBot(lagirc.IRCClient):
-    def __init__(self, network, identity):
+    def __init__(self):
         super().__init__()
-        self.network = network
-        self.nickname = identity['nickname']
-        self.username = identity['username']
-        self.realname = identity['realname']
+        self.nickname = config['global']['nickname']
+        self.username = config['global']['username']
+        self.realname = config['global']['realname']
         self.manager = None
         self.commands = {}
         self.admincommands = {}
@@ -71,7 +70,7 @@ class LagBot(lagirc.IRCClient):
 
     def connected(self):
         print('Connected')
-        for channel in config['networks'][self.network].as_list('channels'):
+        for channel in config['global'].as_list('channels'):
             self.join(channel)
             print('Joined {0}'.format(channel))
 
@@ -79,6 +78,9 @@ class LagBot(lagirc.IRCClient):
         if user == config['global']['admin']:
             return True
         return False
+
+    def get_nick(self, user):
+        return user.split('!', 1)[0]
 
     def privmsg_received(self, user, channel, message):
         if message.startswith('!'):
@@ -100,15 +102,11 @@ class LagBot(lagirc.IRCClient):
         for handler in self.handlers:
             handler.execute(self, user, channel, message)
 
-
 loop = asyncio.get_event_loop()
 if debug:
     loop.set_debug(True)
-for network in config['networks'].keys():
-    identity = config['identities'][config['networks'][network]['identity']]
-    client = LagBot(network, identity)
-    coro = loop.create_connection(lambda: client, config['networks'][network]['host'],
-                                  int(config['networks'][network]['port']))
-    loop.run_until_complete(coro)
+coro = loop.create_connection(lambda: LagBot(), config['global']['host'],
+                              int(config['global']['port']))
+loop.run_until_complete(coro)
 loop.run_forever()
 loop.close()
