@@ -84,7 +84,7 @@ class LagBot(lagirc.IRCClient):
         self.logger.debug('Handlers: {}'.format(self.handlers))
         self.logger.debug('Triggers: {}'.format(self.triggers))
 
-    def connected(self):
+    async def connected(self):
         self.logger.info('Connected')
         for channel in config['global'].as_list('channels'):
             self.join(channel)
@@ -110,7 +110,7 @@ class LagBot(lagirc.IRCClient):
     def get_nick(self, user):
         return user.split('!', 1)[0]
 
-    def privmsg_received(self, user, channel, message):
+    async def privmsg_received(self, user, channel, message):
         self.logger.info('{} <{}> {}'.format(channel, self.get_nick(user), message))
         if message.startswith('!'):
             cmd = message.split(' ', 1)[0].lstrip('!')
