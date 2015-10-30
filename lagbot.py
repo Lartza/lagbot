@@ -32,40 +32,32 @@ class LagBot(lagirc.IRCClient):
         self.realname = config['global']['realname']
         self.manager = None
         self.commands = {}
-        self.admincommands = {}
         self.handlers = []
         self.init_plugins()
 
     def init_plugins(self, reload=False):
         if reload:
             self.commands = {}
-            self.admincommands = {}
             self.handlers = []
             for plugin in self.manager.getAllPlugins():
                 self.manager.deactivatePluginByName(plugin.name)
         self.manager = PluginManager(
             categories_filter={
-                "Command": CommandPlugin,
-                "Handler": HandlerPlugin,
+                'Command': CommandPlugin,
+                'Handler': HandlerPlugin,
             },
-            directories_list=["plugins"], )
+            directories_list=['plugins'], )
         self.manager.collectPlugins()
-        for plugin in self.manager.getPluginsOfCategory("Command"):
-            self.manager.activatePluginByName(plugin.name, "Command")
+        for plugin in self.manager.getPluginsOfCategory('Command'):
+            self.manager.activatePluginByName(plugin.name, 'Command')
             try:
                 for command in plugin.plugin_object.commands:
                     self.commands[command] = plugin.plugin_object
             except AttributeError:
-                pass
-            try:
-                for command in plugin.plugin_object.admincommands:
-                    pluginobject = plugin.plugin_object
-                    adminlevel = plugin.plugin_object.adminlevel
-                    self.admincommands[command] = pluginobject, adminlevel
-            except AttributeError:
-                pass
-        for plugin in self.manager.getPluginsOfCategory("Handler"):
-            self.manager.activatePluginByName(plugin.name, "Handler")
+                print('Plugin {} does not define any commands! Disabling')
+                self.manager.deactivatePluginByName(plugin.name)
+        for plugin in self.manager.getPluginsOfCategory('Handler'):
+            self.manager.activatePluginByName(plugin.name, 'Handler')
             self.handlers.append(plugin.plugin_object)
 
     def connected(self):
@@ -74,8 +66,13 @@ class LagBot(lagirc.IRCClient):
             self.join(channel)
             print('Joined {0}'.format(channel))
 
-    def is_admin(self, user):
-        if user == config['global']['admin']:
+    def is_owner(self, user):
+        if user == config['global']['owner']:
+            return True
+        return False
+
+    def is_op(self, user, channel):
+        if user in config[channel].as_list('ops'):
             return True
         return False
 
@@ -89,14 +86,9 @@ class LagBot(lagirc.IRCClient):
                 plugin = self.commands[cmd]
             except KeyError:
                 plugin = None
-                if self.is_admin(user):
+                if self.is_owner(user):
                     if cmd == 'reload':
                         self.init_plugins(reload=True)
-                    else:
-                        try:
-                            plugin = self.admincommands[cmd][0]
-                        except KeyError:
-                            pass
             if plugin:
                 plugin.execute(self, user, channel, message)
         for handler in self.handlers:
